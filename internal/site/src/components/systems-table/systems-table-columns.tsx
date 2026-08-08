@@ -469,20 +469,15 @@ function formatUsedTotal(usedGb?: number, totalGb?: number): string | null {
 	return `${formatCompactSize(usedGb ?? 0)}/${formatCompactSize(totalGb)}`
 }
 
-function formatMeterLabel(pct: number, detail?: string | null) {
-	const pctText = `${decimalString(pct, pct >= 10 ? 1 : 2)}%`
-	return detail ? `${pctText} · ${detail}` : pctText
-}
-
-/** Thicker bar with label inside; dual-layer text keeps contrast on fill + track. */
+/** Thicker bar; optional detail text inside with dual-layer contrast. */
 function MeterBar({
 	value,
-	label,
+	detail,
 	fillClass,
 	trailing,
 }: {
 	value: number
-	label: string
+	detail?: string | null
 	fillClass: string
 	trailing?: ReactNode
 }) {
@@ -491,21 +486,28 @@ function MeterBar({
 		"flex h-full w-full items-center gap-1 px-1.5 text-[0.7rem] leading-none font-medium tabular-nums tracking-tight whitespace-nowrap"
 
 	return (
-		<div className="relative h-5 min-w-16 w-full rounded-sm bg-muted overflow-hidden">
+		<div className="relative h-5 min-w-12 flex-1 w-full rounded-sm bg-muted overflow-hidden">
 			<div className={cn("absolute inset-y-0 left-0", fillClass)} style={{ width: `${pct}%` }} />
-			{/* Text on empty track */}
-			<span className={cn("absolute inset-0 z-[1] text-foreground/80", labelClass)}>
-				<span className="truncate">{label}</span>
-				{trailing}
-			</span>
-			{/* Matching white text clipped to the filled region */}
-			{pct > 0 && (
-				<span className="absolute inset-y-0 left-0 z-[2] overflow-hidden pointer-events-none" style={{ width: `${pct}%` }}>
-					<span className={cn("text-white", labelClass)} style={{ width: `${(100 / pct) * 100}%` }}>
-						<span className="truncate">{label}</span>
+			{(detail || trailing) && (
+				<>
+					{/* Text on empty track */}
+					<span className={cn("absolute inset-0 z-[1] text-foreground/80", labelClass)}>
+						{detail && <span className="truncate">{detail}</span>}
 						{trailing}
 					</span>
-				</span>
+					{/* Matching white text clipped to the filled region */}
+					{pct > 0 && (
+						<span
+							className="absolute inset-y-0 left-0 z-[2] overflow-hidden pointer-events-none"
+							style={{ width: `${pct}%` }}
+						>
+							<span className={cn("text-white", labelClass)} style={{ width: `${(100 / pct) * 100}%` }}>
+								{detail && <span className="truncate">{detail}</span>}
+								{trailing}
+							</span>
+						</span>
+					)}
+				</>
 			)}
 		</div>
 	)
@@ -536,11 +538,14 @@ function TableCellWithMeter(info: CellContext<SystemRecord, unknown>) {
 	}
 
 	return (
-		<MeterBar
-			value={val}
-			label={formatMeterLabel(val, detail)}
-			fillClass={meterFillClass(info.row.original.status, val, colorWarn, colorCrit)}
-		/>
+		<div className="flex gap-2 items-center tabular-nums tracking-tight w-full">
+			<span className="min-w-8 shrink-0">{decimalString(val, val >= 10 ? 1 : 2)}%</span>
+			<MeterBar
+				value={val}
+				detail={detail}
+				fillClass={meterFillClass(info.row.original.status, val, colorWarn, colorCrit)}
+			/>
+		</div>
 	)
 }
 
@@ -577,11 +582,12 @@ function DiskCellWithMultiple(info: CellContext<SystemRecord, unknown>) {
 				<Link
 					href={getPagePath($router, "system", { id })}
 					tabIndex={-1}
-					className="w-full relative z-10"
+					className="flex gap-2 items-center tabular-nums tracking-tight w-full relative z-10"
 				>
+					<span className="min-w-8 shrink-0">{decimalString(rootDiskPct, rootDiskPct >= 10 ? 1 : 2)}%</span>
 					<MeterBar
 						value={rootDiskPct}
-						label={formatMeterLabel(rootDiskPct, diskDetail)}
+						detail={diskDetail}
 						fillClass={getIndicatorColor(rootDiskPct)}
 						trailing={
 							extraDiskIndicators.length > 0 ? (
