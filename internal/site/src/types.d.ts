@@ -86,6 +86,10 @@ export interface SystemInfo {
 	ds?: number
 	/** disk used (gb) */
 	du?: number
+	/** bandwidth bytes [sent, recv] */
+	bio?: [number, number]
+	/** disk io bytes [read, write] */
+	dio?: [number, number]
 }
 
 export interface SystemStats {

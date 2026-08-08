@@ -804,4 +804,13 @@ func migrateDeprecatedFields(cd *system.CombinedData, createDetails bool) {
 	if cd.Details != nil && cd.Details.Cores > 0 {
 		cd.Info.Cores = cd.Details.Cores
 	}
+	// Split up/down bandwidth for the All Systems table (keep bb as total for sorting)
+	if cd.Stats.Bandwidth[0] > 0 || cd.Stats.Bandwidth[1] > 0 {
+		cd.Info.BandwidthIO = cd.Stats.Bandwidth
+		cd.Info.BandwidthBytes = cd.Stats.Bandwidth[0] + cd.Stats.Bandwidth[1]
+	}
+	// Disk read/write throughput for the All Systems table
+	if cd.Stats.DiskIO[0] > 0 || cd.Stats.DiskIO[1] > 0 {
+		cd.Info.DiskIO = cd.Stats.DiskIO
+	}
 }

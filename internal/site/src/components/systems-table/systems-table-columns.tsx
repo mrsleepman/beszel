@@ -6,7 +6,10 @@ import { getPagePath } from "@nanostores/router"
 import type { CellContext, ColumnDef, HeaderContext } from "@tanstack/react-table"
 import type { ClassValue } from "clsx"
 import {
+	ActivityIcon,
+	ArrowDownIcon,
 	ArrowUpDownIcon,
+	ArrowUpIcon,
 	ChevronRightSquareIcon,
 	ClockArrowUp,
 	CopyIcon,
@@ -25,7 +28,7 @@ import {
 import { memo, useMemo, useRef, useState, type ReactNode } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import { isReadOnlyUser, pb } from "@/lib/api"
-import { BatteryState, ConnectionType, connectionTypeLabels, MeterState, SystemStatus } from "@/lib/enums"
+import { BatteryState, ConnectionType, connectionTypeLabels, MeterState, SystemStatus, Unit } from "@/lib/enums"
 import { $longestSystemNameLen, $userSettings } from "@/lib/stores"
 import {
 	cn,
@@ -193,6 +196,38 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			header: sortableHeader,
 		},
 		{
+			accessorFn: ({ info, status }) => {
+				if (status !== SystemStatus.Up) return undefined
+				const dio = info.dio
+				if (!dio) return undefined
+				return dio[0] + dio[1]
+			},
+			id: "diskIO",
+			name: () => t({ message: "Disk IO", comment: "Disk read/write throughput column" }),
+			size: 0,
+			Icon: ActivityIcon,
+			header: sortableHeader,
+			sortUndefined: "last",
+			cell(info) {
+				const total = info.getValue() as number | undefined
+				if (total === undefined) {
+					return null
+				}
+				const userSettings = useStore($userSettings, { keys: ["unitDisk"] })
+				const dio = info.row.original.info.dio ?? [0, 0]
+				const [read, write] = dio
+				return (
+					<RateUpDownCell
+						down={read}
+						up={write}
+						unit={userSettings.unitDisk}
+						downTitle={t({ message: "Read", comment: "Disk read" })}
+						upTitle={t({ message: "Write", comment: "Disk write" })}
+					/>
+				)
+			},
+		},
+		{
 			accessorFn: ({ info }) => info.g || undefined,
 			id: "gpu",
 			name: () => "GPU",
@@ -247,12 +282,27 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			header: sortableHeader,
 			sortUndefined: "last",
 			cell(info) {
-				const val = info.getValue() as number | undefined
-				if (val === undefined) {
+				const total = info.getValue() as number | undefined
+				if (total === undefined) {
 					return null
 				}
 				const userSettings = useStore($userSettings, { keys: ["unitNet"] })
-				const { value, unit } = formatBytes(val, true, userSettings.unitNet, false)
+				const bio = info.row.original.info.bio
+				// Prefer split up/down when available
+				if (bio) {
+					const [sent, recv] = bio
+					return (
+						<RateUpDownCell
+							down={recv}
+							up={sent}
+							unit={userSettings.unitNet}
+							downTitle={t`Download`}
+							upTitle={t`Upload`}
+						/>
+					)
+				}
+
+				const { value, unit } = formatBytes(total, true, userSettings.unitNet, false)
 				return (
 					<span className="tabular-nums whitespace-nowrap">
 						{decimalString(value, value >= 100 ? 1 : 2)} {unit}
@@ -455,6 +505,37 @@ function sortableHeader(context: HeaderContext<SystemRecord, unknown>) {
 			{name()}
 			{hideSort || <ArrowUpDownIcon className="ms-2 size-4" />}
 		</Button>
+	)
+}
+
+function RateUpDownCell({
+	down,
+	up,
+	unit,
+	downTitle,
+	upTitle,
+}: {
+	down: number
+	up: number
+	unit?: Unit
+	downTitle: string
+	upTitle: string
+}) {
+	const formatRate = (bytes: number) => {
+		const { value, unit: rateUnit } = formatBytes(bytes, true, unit, false)
+		return `${decimalString(value, value >= 100 ? 1 : 2)} ${rateUnit}`
+	}
+	return (
+		<span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
+			<span className="inline-flex items-center gap-0.5" title={downTitle}>
+				<ArrowDownIcon className="size-3 opacity-60 shrink-0" />
+				{formatRate(down)}
+			</span>
+			<span className="inline-flex items-center gap-0.5" title={upTitle}>
+				<ArrowUpIcon className="size-3 opacity-60 shrink-0" />
+				{formatRate(up)}
+			</span>
+		</span>
 	)
 }
 

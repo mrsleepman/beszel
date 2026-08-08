@@ -160,6 +160,10 @@ type Info struct {
 	MemUsed   float64 `json:"mu,omitzero" cbor:"25,keyasint,omitzero"` // memory used (GB)
 	DiskTotal float64 `json:"ds,omitzero" cbor:"26,keyasint,omitzero"` // disk total (GB)
 	DiskUsed  float64 `json:"du,omitzero" cbor:"27,keyasint,omitzero"` // disk used (GB)
+	// BandwidthIO is [sent, recv] bytes for the current interval (All Systems table)
+	BandwidthIO [2]uint64 `json:"bio,omitzero" cbor:"28,keyasint,omitzero"`
+	// DiskIO is [read, write] bytes for the current interval (All Systems table)
+	DiskIO [2]uint64 `json:"dio,omitzero" cbor:"29,keyasint,omitzero"`
 }
 
 // Data that does not change during process lifetime and is not needed in All Systems table
