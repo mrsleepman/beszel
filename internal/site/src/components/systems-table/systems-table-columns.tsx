@@ -203,7 +203,7 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 				return dio[0] + dio[1]
 			},
 			id: "diskIO",
-			name: () => t({ message: "Disk IO", comment: "Disk read/write throughput column" }),
+			name: () => t`Disk I/O`,
 			size: 0,
 			Icon: ActivityIcon,
 			header: sortableHeader,
@@ -234,6 +234,43 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			cell: TableCellWithMeter,
 			Icon: GpuIcon,
 			header: sortableHeader,
+		},
+		{
+			accessorFn: ({ info, status }) => (status !== SystemStatus.Up ? undefined : info.bb),
+			id: "net",
+			name: () => t`Net`,
+			size: 0,
+			Icon: EthernetIcon,
+			header: sortableHeader,
+			sortUndefined: "last",
+			cell(info) {
+				const total = info.getValue() as number | undefined
+				if (total === undefined) {
+					return null
+				}
+				const userSettings = useStore($userSettings, { keys: ["unitNet"] })
+				const bio = info.row.original.info.bio
+				// Prefer split up/down when available
+				if (bio) {
+					const [sent, recv] = bio
+					return (
+						<RateUpDownCell
+							down={recv}
+							up={sent}
+							unit={userSettings.unitNet}
+							downTitle={t`Download`}
+							upTitle={t`Upload`}
+						/>
+					)
+				}
+
+				const { value, unit } = formatBytes(total, true, userSettings.unitNet, false)
+				return (
+					<span className="tabular-nums whitespace-nowrap">
+						{decimalString(value, value >= 100 ? 1 : 2)} {unit}
+					</span>
+				)
+			},
 		},
 		{
 			id: "loadAverage",
@@ -270,43 +307,6 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 							<span key={i}>{decimalString(la, la >= 10 ? 1 : 2)}</span>
 						))}
 					</div>
-				)
-			},
-		},
-		{
-			accessorFn: ({ info, status }) => (status !== SystemStatus.Up ? undefined : info.bb),
-			id: "net",
-			name: () => t`Net`,
-			size: 0,
-			Icon: EthernetIcon,
-			header: sortableHeader,
-			sortUndefined: "last",
-			cell(info) {
-				const total = info.getValue() as number | undefined
-				if (total === undefined) {
-					return null
-				}
-				const userSettings = useStore($userSettings, { keys: ["unitNet"] })
-				const bio = info.row.original.info.bio
-				// Prefer split up/down when available
-				if (bio) {
-					const [sent, recv] = bio
-					return (
-						<RateUpDownCell
-							down={recv}
-							up={sent}
-							unit={userSettings.unitNet}
-							downTitle={t`Download`}
-							upTitle={t`Upload`}
-						/>
-					)
-				}
-
-				const { value, unit } = formatBytes(total, true, userSettings.unitNet, false)
-				return (
-					<span className="tabular-nums whitespace-nowrap">
-						{decimalString(value, value >= 100 ? 1 : 2)} {unit}
-					</span>
 				)
 			},
 		},
