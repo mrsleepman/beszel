@@ -22,7 +22,7 @@ import {
 	Trash2Icon,
 	WifiIcon,
 } from "lucide-react"
-import { memo, useMemo, useRef, useState } from "react"
+import { memo, useMemo, useRef, useState, type ReactNode } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import { isReadOnlyUser, pb } from "@/lib/api"
 import { BatteryState, ConnectionType, connectionTypeLabels, MeterState, SystemStatus } from "@/lib/enums"
@@ -469,18 +469,61 @@ function formatUsedTotal(usedGb?: number, totalGb?: number): string | null {
 	return `${formatCompactSize(usedGb ?? 0)}/${formatCompactSize(totalGb)}`
 }
 
+function formatMeterLabel(pct: number, detail?: string | null) {
+	const pctText = `${decimalString(pct, pct >= 10 ? 1 : 2)}%`
+	return detail ? `${pctText} · ${detail}` : pctText
+}
+
+/** Thicker bar with label inside; dual-layer text keeps contrast on fill + track. */
+function MeterBar({
+	value,
+	label,
+	fillClass,
+	trailing,
+}: {
+	value: number
+	label: string
+	fillClass: string
+	trailing?: ReactNode
+}) {
+	const pct = Math.min(100, Math.max(0, value))
+	const labelClass =
+		"flex h-full w-full items-center gap-1 px-1.5 text-[0.7rem] leading-none font-medium tabular-nums tracking-tight whitespace-nowrap"
+
+	return (
+		<div className="relative h-5 min-w-16 w-full rounded-sm bg-muted overflow-hidden">
+			<div className={cn("absolute inset-y-0 left-0", fillClass)} style={{ width: `${pct}%` }} />
+			{/* Text on empty track */}
+			<span className={cn("absolute inset-0 z-[1] text-foreground/80", labelClass)}>
+				<span className="truncate">{label}</span>
+				{trailing}
+			</span>
+			{/* Matching white text clipped to the filled region */}
+			{pct > 0 && (
+				<span className="absolute inset-y-0 left-0 z-[2] overflow-hidden pointer-events-none" style={{ width: `${pct}%` }}>
+					<span className={cn("text-white", labelClass)} style={{ width: `${(100 / pct) * 100}%` }}>
+						<span className="truncate">{label}</span>
+						{trailing}
+					</span>
+				</span>
+			)}
+		</div>
+	)
+}
+
+function meterFillClass(status: string, pct: number, colorWarn: number, colorCrit: number) {
+	const threshold = getMeterStateByThresholds(pct, colorWarn, colorCrit)
+	return (
+		(status !== SystemStatus.Up && STATUS_COLORS.paused) ||
+		(threshold === MeterState.Good && STATUS_COLORS.up) ||
+		(threshold === MeterState.Warn && STATUS_COLORS.pending) ||
+		STATUS_COLORS.down
+	)
+}
+
 function TableCellWithMeter(info: CellContext<SystemRecord, unknown>) {
 	const { colorWarn = 65, colorCrit = 90 } = useStore($userSettings, { keys: ["colorWarn", "colorCrit"] })
 	const val = Number(info.getValue()) || 0
-	const threshold = getMeterStateByThresholds(val, colorWarn, colorCrit)
-	const meterClass = cn(
-		"h-full",
-		(info.row.original.status !== SystemStatus.Up && STATUS_COLORS.paused) ||
-			(threshold === MeterState.Good && STATUS_COLORS.up) ||
-			(threshold === MeterState.Warn && STATUS_COLORS.pending) ||
-			STATUS_COLORS.down
-	)
-
 	const sysInfo = info.row.original.info
 	const colId = info.column.id
 	let detail: string | null = null
@@ -493,14 +536,11 @@ function TableCellWithMeter(info: CellContext<SystemRecord, unknown>) {
 	}
 
 	return (
-		<div className="flex gap-2 items-center tabular-nums tracking-tight w-full">
-			<span className="min-w-8 shrink-0 whitespace-nowrap">
-				{decimalString(val, val >= 10 ? 1 : 2)}%{detail ? ` · ${detail}` : ""}
-			</span>
-			<span className="flex-1 min-w-8 grid bg-muted h-[1em] rounded-sm overflow-hidden">
-				<span className={meterClass} style={{ width: `${val}%` }}></span>
-			</span>
-		</div>
+		<MeterBar
+			value={val}
+			label={formatMeterLabel(val, detail)}
+			fillClass={meterFillClass(info.row.original.status, val, colorWarn, colorCrit)}
+		/>
 	)
 }
 
@@ -515,13 +555,7 @@ function DiskCellWithMultiple(info: CellContext<SystemRecord, unknown>) {
 	extraFs.sort((a, b) => b[1] - a[1])
 
 	function getIndicatorColor(pct: number) {
-		const threshold = getMeterStateByThresholds(pct, colorWarn, colorCrit)
-		return (
-			(status !== SystemStatus.Up && STATUS_COLORS.paused) ||
-			(threshold === MeterState.Good && STATUS_COLORS.up) ||
-			(threshold === MeterState.Warn && STATUS_COLORS.pending) ||
-			STATUS_COLORS.down
-		)
+		return meterFillClass(status, pct, colorWarn, colorCrit)
 	}
 
 	function getMeterClass(pct: number) {
@@ -543,28 +577,25 @@ function DiskCellWithMultiple(info: CellContext<SystemRecord, unknown>) {
 				<Link
 					href={getPagePath($router, "system", { id })}
 					tabIndex={-1}
-					className="flex flex-col gap-0.5 w-full relative z-10"
+					className="w-full relative z-10"
 				>
-					<div className="flex gap-2 items-center tabular-nums tracking-tight">
-						<span className="min-w-8 shrink-0 whitespace-nowrap">
-							{decimalString(rootDiskPct, rootDiskPct >= 10 ? 1 : 2)}%
-							{diskDetail ? ` · ${diskDetail}` : ""}
-						</span>
-						<span className="flex-1 min-w-8 flex items-center gap-0.5 px-1 justify-end bg-muted h-[1em] rounded-sm overflow-hidden relative">
-							{/* Root disk */}
-							<span
-								className={cn("absolute inset-0", getMeterClass(rootDiskPct))}
-								style={{ width: `${rootDiskPct}%` }}
-							></span>
-							{/* Extra disk indicators */}
-							{extraDiskIndicators.map((color) => (
-								<span
-									key={color}
-									className={cn("size-1.5 rounded-full shrink-0 outline-[0.5px] outline-muted", color)}
-								/>
-							))}
-						</span>
-					</div>
+					<MeterBar
+						value={rootDiskPct}
+						label={formatMeterLabel(rootDiskPct, diskDetail)}
+						fillClass={getIndicatorColor(rootDiskPct)}
+						trailing={
+							extraDiskIndicators.length > 0 ? (
+								<span className="ms-auto flex items-center gap-0.5 shrink-0">
+									{extraDiskIndicators.map((color) => (
+										<span
+											key={color}
+											className={cn("size-1.5 rounded-full shrink-0 outline-[0.5px] outline-muted", color)}
+										/>
+									))}
+								</span>
+							) : undefined
+						}
+					/>
 				</Link>
 			</TooltipTrigger>
 			<TooltipContent side="right" className="max-w-xs pb-2">
