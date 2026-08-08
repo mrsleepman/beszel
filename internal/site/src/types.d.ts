@@ -43,9 +43,9 @@ export interface SystemInfo {
 	/** cpu threads */
 	t?: number
 	/** cpu cores */
-	c: number
+	c?: number
 	/** cpu model */
-	m: string
+	m?: string
 	/** load average */
 	la?: [number, number, number]
 	/** operating system */
@@ -78,6 +78,14 @@ export interface SystemInfo {
 	efs?: Record<string, number>
 	/** services [totalServices, numFailedServices] */
 	sv?: [number, number]
+	/** memory total (gb) */
+	mt?: number
+	/** memory used (gb) */
+	mu?: number
+	/** disk total (gb) */
+	ds?: number
+	/** disk used (gb) */
+	du?: number
 }
 
 export interface SystemStats {

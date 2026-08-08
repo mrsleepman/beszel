@@ -238,6 +238,14 @@ func (sys *System) createRecords(data *system.CombinedData) (*core.Record, error
 			}
 		}
 
+		// Preserve cores across updates when Details was not re-sent this cycle
+		if data.Info.Cores == 0 {
+			var existingInfo system.Info
+			if err := systemRecord.UnmarshalJSONField("info", &existingInfo); err == nil && existingInfo.Cores > 0 {
+				data.Info.Cores = existingInfo.Cores
+			}
+		}
+
 		// update system record (do this last because it triggers alerts and we need above records to be inserted first)
 		systemRecord.Set("status", up)
 		systemRecord.Set("info", data.Info)
@@ -781,5 +789,19 @@ func migrateDeprecatedFields(cd *system.CombinedData, createDetails bool) {
 		cd.Info.CpuModel = ""
 		cd.Info.Podman = false
 		cd.Info.Os = 0
+	}
+
+	// Enrich Info with absolute values for the All Systems table.
+	// Prefer Stats (always present) so older agents still get mem/disk totals.
+	if cd.Stats.Mem > 0 {
+		cd.Info.Mem = cd.Stats.Mem
+		cd.Info.MemUsed = cd.Stats.MemUsed
+	}
+	if cd.Stats.DiskTotal > 0 {
+		cd.Info.DiskTotal = cd.Stats.DiskTotal
+		cd.Info.DiskUsed = cd.Stats.DiskUsed
+	}
+	if cd.Details != nil && cd.Details.Cores > 0 {
+		cd.Info.Cores = cd.Details.Cores
 	}
 }

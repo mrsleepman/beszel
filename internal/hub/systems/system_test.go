@@ -118,8 +118,15 @@ func TestCombinedData_MigrateDeprecatedFields(t *testing.T) {
 			t.Errorf("expected MemoryTotal %d, got %d", expectedMem, cd.Details.MemoryTotal)
 		}
 
-		if cd.Info.Hostname != "" || cd.Info.KernelVersion != "" || cd.Info.Cores != 0 || cd.Info.CpuModel != "" || cd.Info.Podman != false || cd.Info.Os != 0 {
-			t.Errorf("expected Info fields to be reset, got %+v", cd.Info)
+		if cd.Info.Hostname != "" || cd.Info.KernelVersion != "" || cd.Info.CpuModel != "" || cd.Info.Podman != false || cd.Info.Os != 0 {
+			t.Errorf("expected deprecated Info fields to be reset, got %+v", cd.Info)
+		}
+		// Cores and memory totals are kept/enriched for the All Systems table
+		if cd.Info.Cores != 8 {
+			t.Errorf("expected Info.Cores to be restored to 8, got %d", cd.Info.Cores)
+		}
+		if cd.Info.Mem != 16.0 {
+			t.Errorf("expected Info.Mem 16, got %f", cd.Info.Mem)
 		}
 	})
 

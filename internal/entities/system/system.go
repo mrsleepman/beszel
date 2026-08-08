@@ -155,6 +155,11 @@ type Info struct {
 	ExtraFsPct     map[string]float64 `json:"efs,omitempty" cbor:"21,keyasint,omitempty"`
 	Services       []uint16           `json:"sv,omitempty" cbor:"22,keyasint,omitempty"` // [totalServices, numFailedServices]
 	Battery        [2]uint8           `json:"bat,omitzero" cbor:"23,keyasint,omitzero"`  // [percent, charge state]
+	// Absolute values for All Systems table (alongside percentages)
+	Mem       float64 `json:"mt,omitzero" cbor:"24,keyasint,omitzero"` // memory total (GB)
+	MemUsed   float64 `json:"mu,omitzero" cbor:"25,keyasint,omitzero"` // memory used (GB)
+	DiskTotal float64 `json:"ds,omitzero" cbor:"26,keyasint,omitzero"` // disk total (GB)
+	DiskUsed  float64 `json:"du,omitzero" cbor:"27,keyasint,omitzero"` // disk used (GB)
 }
 
 // Data that does not change during process lifetime and is not needed in All Systems table

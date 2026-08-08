@@ -458,6 +458,17 @@ function sortableHeader(context: HeaderContext<SystemRecord, unknown>) {
 	)
 }
 
+function formatCompactSize(gb: number): string {
+	const { value, unit } = formatBytes(gb * 1024, false, undefined, true)
+	const shortUnit = unit.replace("B", "") // GB -> G, MB -> M, TB -> T
+	return `${decimalString(value, value >= 10 ? 1 : 2)}${shortUnit}`
+}
+
+function formatUsedTotal(usedGb?: number, totalGb?: number): string | null {
+	if (!totalGb) return null
+	return `${formatCompactSize(usedGb ?? 0)}/${formatCompactSize(totalGb)}`
+}
+
 function TableCellWithMeter(info: CellContext<SystemRecord, unknown>) {
 	const { colorWarn = 65, colorCrit = 90 } = useStore($userSettings, { keys: ["colorWarn", "colorCrit"] })
 	const val = Number(info.getValue()) || 0
@@ -469,9 +480,23 @@ function TableCellWithMeter(info: CellContext<SystemRecord, unknown>) {
 			(threshold === MeterState.Warn && STATUS_COLORS.pending) ||
 			STATUS_COLORS.down
 	)
+
+	const sysInfo = info.row.original.info
+	const colId = info.column.id
+	let detail: string | null = null
+	if (colId === "cpu" && sysInfo.c) {
+		detail = `${sysInfo.c}c`
+	} else if (colId === "memory") {
+		detail = formatUsedTotal(sysInfo.mu, sysInfo.mt)
+	} else if (colId === "disk") {
+		detail = formatUsedTotal(sysInfo.du, sysInfo.ds)
+	}
+
 	return (
 		<div className="flex gap-2 items-center tabular-nums tracking-tight w-full">
-			<span className="min-w-8 shrink-0">{decimalString(val, val >= 10 ? 1 : 2)}%</span>
+			<span className="min-w-8 shrink-0 whitespace-nowrap">
+				{decimalString(val, val >= 10 ? 1 : 2)}%{detail ? ` · ${detail}` : ""}
+			</span>
 			<span className="flex-1 min-w-8 grid bg-muted h-[1em] rounded-sm overflow-hidden">
 				<span className={meterClass} style={{ width: `${val}%` }}></span>
 			</span>
@@ -484,6 +509,7 @@ function DiskCellWithMultiple(info: CellContext<SystemRecord, unknown>) {
 	const { info: sysInfo, status, id } = info.row.original
 	const extraFs = Object.entries(sysInfo.efs ?? {})
 	const rootDiskPct = sysInfo.dp
+	const diskDetail = formatUsedTotal(sysInfo.du, sysInfo.ds)
 
 	// sort extra disks by percentage descending
 	extraFs.sort((a, b) => b[1] - a[1])
@@ -520,7 +546,10 @@ function DiskCellWithMultiple(info: CellContext<SystemRecord, unknown>) {
 					className="flex flex-col gap-0.5 w-full relative z-10"
 				>
 					<div className="flex gap-2 items-center tabular-nums tracking-tight">
-						<span className="min-w-8 shrink-0">{decimalString(rootDiskPct, rootDiskPct >= 10 ? 1 : 2)}%</span>
+						<span className="min-w-8 shrink-0 whitespace-nowrap">
+							{decimalString(rootDiskPct, rootDiskPct >= 10 ? 1 : 2)}%
+							{diskDetail ? ` · ${diskDetail}` : ""}
+						</span>
 						<span className="flex-1 min-w-8 flex items-center gap-0.5 px-1 justify-end bg-muted h-[1em] rounded-sm overflow-hidden relative">
 							{/* Root disk */}
 							<span
@@ -543,6 +572,7 @@ function DiskCellWithMultiple(info: CellContext<SystemRecord, unknown>) {
 					<div className="grid gap-0.5">
 						<div className="text-[0.65rem] text-muted-foreground uppercase tracking-wide tabular-nums">
 							<Trans context="Root disk label">Root</Trans>
+							{diskDetail ? ` · ${diskDetail}` : ""}
 						</div>
 						<div className="flex gap-2 items-center tabular-nums text-xs">
 							<span className="min-w-7">{decimalString(rootDiskPct, rootDiskPct >= 10 ? 1 : 2)}%</span>
